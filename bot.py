@@ -1,3 +1,9 @@
+import sys
+import os
+
+# Terminal / Output encoding ကို UTF-8 အဖြစ် သတ်မှတ်ခြင်း
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
 import os
 import sqlite3
 import logging
