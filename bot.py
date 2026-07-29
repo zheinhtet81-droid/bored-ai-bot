@@ -1,16 +1,15 @@
+import os
 import sys
-import os
-
-# Terminal / Output encoding ကို UTF-8 အဖြစ် သတ်မှတ်ခြင်း
-sys.stdout.reconfigure(encoding='utf-8')
-sys.stderr.reconfigure(encoding='utf-8')
-import os
 import sqlite3
 import logging
+import requests
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from groq import Groq
+
+# Standard output ကို UTF-8 ပြောင်းခြင်း
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
 
 # Logging setup
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -20,9 +19,6 @@ load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-
-# Initialize Groq Client
-client = Groq(api_key=GROQ_API_KEY)
 
 # Database Initialization
 def init_db():
@@ -68,7 +64,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     register_user(user.id, user.username)
     
     welcome_text = (
-        " မင်္ဂလာပါခင်ဗျာ! **Bored AI** မှ ကြိုဆိုပါတယ်။\n\n"
+        "👋 မင်္ဂလာပါခင်ဗျာ! **Bored AI** မှ ကြိုဆိုပါတယ်။\n\n"
         "ပိုမိုတိကျသော analysis ရရှိရန် မွေးသက္ကရာဇ်ကို ထည့်သွင်းပေးပါ။\n"
         "(ဥပမာ - `/set_birth_date 2009_03_23`)\n\n"
         "စတင်ကြည့်ရအောင်! 😊"
@@ -83,9 +79,9 @@ async def set_birth_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     birth_date = context.args[0]
     set_user_birth_date(user_id, birth_date)
-    await update.message.reply_text(f" မွေးသက္ကရာဇ် **{birth_date}** ကို သိမ်းဆည်းပြီးပါပြီ!\n\nအကောင့်သစ်အတွက် **10 coins free** ရရှိပါပြီ! ", parse_mode='Markdown')
+    await update.message.reply_text(f"✅ မွေးသက္ကရာဇ် **{birth_date}** ကို သိမ်းဆည်းပြီးပါပြီ!\n\nအကောင့်သစ်အတွက် **10 coins free** ရရှိပါပြီ! 🎉", parse_mode='Markdown')
 
-# Message Handler using Groq Llama 3 AI
+# Message Handler (Direct Requests to Groq API)
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_text = update.message.text
@@ -95,26 +91,40 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if birth_date:
         prompt += f"\nUser Birth Date: {birth_date}"
 
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json; charset=utf-8"
+    }
+
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are a helpful AI assistant. Always respond in natural Burmese language."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "temperature": 0.7
+    }
+
     try:
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a helpful and friendly AI assistant. Reply in the same language as the user (mainly Burmese)."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            temperature=0.7,
-            max_tokens=1024,
-        )
-        reply_message = completion.choices[0].message.content
-        await update.message.reply_text(reply_message)
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        res = requests.post(url, headers=headers, json=payload, timeout=20)
+        data = res.json()
+
+        if res.status_code == 200:
+            reply_message = data['choices'][0]['message']['content']
+            await update.message.reply_text(reply_message)
+        else:
+            err_msg = data.get('error', {}).get('message', 'Unknown error')
+            await update.message.reply_text(f"🔴 AI Error ({res.status_code}): {err_msg}")
+
     except Exception as e:
-        await update.message.reply_text(f" AI error: {str(e)}")
+        await update.message.reply_text(f"🔴 Connection Error: {str(e)}")
 
 def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
@@ -123,7 +133,7 @@ def main():
     app.add_handler(CommandHandler("set_birth_date", set_birth_date))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("Bot running with Groq AI...")
+    print("Bot is running...")
     app.run_polling()
 
 if __name__ == "__main__":
