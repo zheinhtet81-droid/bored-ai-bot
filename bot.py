@@ -190,25 +190,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.username or "Unknown"
     register_user(user_id, username)
     logger.info(f"User {user_id} (@{username}) started the bot")
-    
-    await update.message.reply_text(
-        "👋 မင်္ဂလာပါခင်ဗျာ! **Bored AI** ကို ကြိုဆိုပါတယ်။
 
-"
-        "ပိုမိုတိကျသော analysis ရရှိရန် မွေးသက္ကရာဇ်ကို ထည့်သွင်းပေးပါ။
+    welcome_text = """👋 မင်္ဂလာပါခင်ဗျာ! **Bored AI** ကို ကြိုဆိုပါတယ်။
 
-"
-        "ဤ bot ကို အသုံးပြုခြင်းအားဖြင့် သင်၏ မွေးသက္ကရာဇ်ကို လုံခြုံစွာ သိမ်းဆည်းထားမည်ဖြစ်ပြီး ဘယ်သူမှ မသိနိုင်ပါ။
+ပိုမိုတိကျသော analysis ရရှိရန် မွေးသက္ကရာဇ်ကို ထည့်သွင်းပေးပါ။
 
-"
-        "အတုမွေးသက္ကရာဇ်ထည့်ပါက result မှားယွင်းနိုင်ပါသည်။
+ဤ bot ကို အသုံးပြုခြင်းအားဖြင့် သင်၏ မွေးသက္ကရာဇ်ကို လုံခြုံစွာ သိမ်းဆည်းထားမည်ဖြစ်ပြီး မည်သူမျှ မသိနိုင်ပါ။
 
-"
-        "Clone account ဖွင့်ပါက result ကွဲသွားနိုင်ပါသည်။
+အတုမွေးသက္ကရာဇ်ထည့်ပါက result မှားယွင်းနိုင်ပါသည်။
 
-"
-        "စတင်ကြည့်ရအောင်! 😊"
-    )
+Clone account ဖွင့်ပါက result လွဲသွားနိုင်ပါသည်။
+
+စတင်ကြည့်ရအောင်! 😊"""
+
+    await update.message.reply_text(welcome_text)
+
 
 async def set_birth_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
