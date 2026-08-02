@@ -7,20 +7,20 @@ from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# Standard output encoding setup
+# UTF-8 Encoding for terminal/logs
 sys.stdout.reconfigure(encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
 
-# Logging setup
+# Logging Setup
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# Load environment variables
+# Load Environment Variables
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# Database Initialization
+# SQLite Database Setup
 def init_db():
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
@@ -68,18 +68,18 @@ def get_user_info(user_id):
         return {"birth_date": result[0], "language": result[1]}
     return {"birth_date": None, "language": "Burmese"}
 
-# Command Handlers
+# Telegram Command Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     register_user(user.id, user.username)
     
     welcome_text = (
         "👋 မင်္ဂလာပါ! **AstroOracle AI** မှ ကြိုဆိုပါတယ်။\n\n"
-        "🌐 **၁။ ဘာသာစကား ပြောင်းရန်:**\n"
+        "📅 **မွေးသက္ကရာဇ် မှတ်သားရန်:**\n"
+        "`/set_birth_date 2005_03_23` (တစ်ကြိမ်ပဲ ထည့်ရန် လိုပါသည်။)\n\n"
+        "🌐 **ဘာသာစကား ပြောင်းရန်:**\n"
         "`/lang English` သို့မဟုတ် `/lang Burmese`\n\n"
-        "📅 **၂။ မွေးသက္ကရာဇ် ထည့်ရန်:**\n"
-        "(ဥပမာ - `/set_birth_date 2005_03_23`)\n\n"
-        "🔮 မွေးသက္ကရာဇ် ထည့်ပြီးပါက သိလိုသမျှ မေးမြန်းနိုင်ပြီး **ဟောကိန်း၊ ဆောင်ရန်/ရှောင်ရန်၊ ဓာတ်စာနှင့် ယတြာများ** ကို အသေးစိတ် ရှင်းပြပေးပါမည်!"
+        "💬 ထို့နောက် သင့်စိတ်ကြိုက် ဗေဒင်/ဇာတာ မေးခွန်းများ သို့မဟုတ် သိလိုသမျှကို လွတ်လပ်စွာ မေးမြန်းနိုင်ပါပြီ!"
     )
     await update.message.reply_text(welcome_text, parse_mode='Markdown')
 
@@ -91,7 +91,7 @@ async def set_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     lang = context.args[0].capitalize()
     set_user_language(user_id, lang)
-    await update.message.reply_text(f"✅ Main Preferred Language set to: **{lang}**", parse_mode='Markdown')
+    await update.message.reply_text(f"✅ Preferred Language set to: **{lang}**", parse_mode='Markdown')
 
 async def set_birth_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -101,9 +101,9 @@ async def set_birth_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     birth_date = context.args[0]
     set_user_birth_date(user_id, birth_date)
-    await update.message.reply_text(f"✅ မွေးသက္ကရာဇ် **{birth_date}** ကို မှတ်သားလိုက်ပါပြီ!", parse_mode='Markdown')
+    await update.message.reply_text(f"✅ မွေးသက္ကရာဇ် **{birth_date}** ကို မှတ်သားလိုက်ပါပြီ! နောက်တစ်ကြိမ် ထပ်ထည့်ရန် မလိုတော့ပါ။", parse_mode='Markdown')
 
-# Message Handler
+# Message Handler (Groq API Call)
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_text = update.message.text
@@ -112,26 +112,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     birth_date = user_info.get("birth_date")
     preferred_lang = user_info.get("language", "Burmese")
 
-    # STRICT NATURAL BURMESE PROMPT
     system_prompt = (
-        "You are 'AstroOracle AI', a master Burmese astrologer. "
-        "CRITICAL LANGUAGE INSTRUCTION: "
-        "Write in natural, simple, and realistic spoken Burmese language. "
-        "DO NOT write literal English translations. Avoid strange nonsensical words (e.g., NEVER use terms like 'လက်ကိုင်အရာ', 'အရေးအခင်း', 'ပုလဲဝတ်ပါ'). "
-        "Use natural Myanmar astrological terms like 'ယတြာ', 'ဆောင်ရန်/ရှောင်ရန်', 'ကံဇာတာ', 'အကျိုးပေးရတနာ', 'နေ့နံ'.\n"
-        "Provide your answer organized clearly in bullet points:\n"
-        "1. 🔮 **ဒီနေ့ ကံဇာတာ** (General Prediction)\n"
-        "2. 💡 **အကြံပြုချက်နှင့် ဆောင်ရန်/ရှောင်ရန်** (Advice & Dos/Don'ts)\n"
-        "3. 🍀 **အကျိုးပေး အရောင်နှင့် အဆောင်** (Lucky Colors & Charms)\n"
-        "4. 🙏 **ယတြာနှင့် ပြုလုပ်ရန် ကုသိုလ်** (Remedies & Good Deeds)\n"
-        f"Always answer in '{preferred_lang}'."
+        "You are 'AstroOracle AI', an expert Burmese astrologer and helpful AI assistant. "
+        "STRICT INSTRUCTIONS:\n"
+        "1. Respond directly, politely, and naturally to whatever the user asks.\n"
+        "2. DO NOT force astrology if the user is asking general questions or just chatting.\n"
+        "3. If they ask about horoscopes/fate, use their saved birth date silently. NEVER ask or bug the user to set their birth date again if it's already provided.\n"
+        "4. NATURAL LANGUAGE: Write in smooth, realistic spoken Burmese (or preferred language). Avoid weird English-to-Burmese word-for-word translations. NEVER use bizarre terms like 'လက်ကိုင်အရာ', 'အရေးအခင်း', 'ပုလဲဝတ်ပါ'. Use correct terms like 'ယတြာ', 'ဆောင်ရန်/ရှောင်ရန်', 'ကံဇာတာ', 'အကျိုးပေးရတနာ'.\n"
+        f"Preferred Language: {preferred_lang}."
     )
 
-    user_payload_prompt = f"User Question: {user_text}\nPreferred Response Language: {preferred_lang}"
+    user_payload_prompt = f"User Question: {user_text}"
     if birth_date:
-        user_payload_prompt += f"\nUser Birth Date: {birth_date}"
-    else:
-        user_payload_prompt += "\nNote: User hasn't set a birth date. Gently ask them to set it using /set_birth_date for custom readings."
+        user_payload_prompt += f"\n(User Birth Date in Database: {birth_date})"
 
     clean_api_key = GROQ_API_KEY.strip() if GROQ_API_KEY else ""
 
@@ -152,12 +145,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "content": user_payload_prompt
             }
         ],
-        "temperature": 0.4
+        "temperature": 0.5
     }
 
     try:
         url = "https://api.groq.com/openai/v1/chat/completions"
-        res = requests.post(url, headers=headers, json=payload, timeout=25)
+        res = requests.post(url, headers=headers, json=payload, timeout=30)
         data = res.json()
 
         if res.status_code == 200:
@@ -178,7 +171,7 @@ def main():
     app.add_handler(CommandHandler("set_birth_date", set_birth_date))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("AstroOracle Bot running...")
+    print("AstroOracle Bot is successfully running...")
     app.run_polling()
 
 if __name__ == "__main__":
