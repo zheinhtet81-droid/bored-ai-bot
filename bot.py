@@ -127,7 +127,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         user_payload_prompt += "\nNote: User has not set a birth date. Kindly remind them to use /set_birth_date for deeper accuracy."
 
-    # Remove extra spaces or quotes from key
     clean_api_key = GROQ_API_KEY.strip() if GROQ_API_KEY else ""
 
     headers = {
@@ -135,9 +134,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Content-Type": "application/json"
     }
 
-    # Using standard stable Groq model name
     payload = {
-        "model": "llama3-70b-8192",
+        "model": "llama-3.3-70b-versatile",
         "messages": [
             {
                 "role": "system",
