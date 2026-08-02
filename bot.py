@@ -74,10 +74,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     register_user(user.id, user.username)
     
     welcome_text = (
-        "👋 မင်္ဂလာပါ! **Grand Master Astrology & Remedy AI** မှ ကြိုဆိုပါတယ်။\n\n"
-        "🌐 **1. ဘာသာစကား ပြောင်းရန် / Set Language:**\n"
+        "👋 မင်္ဂလာပါ! **AstroOracle AI** မှ ကြိုဆိုပါတယ်။\n\n"
+        "🌐 **၁။ ဘာသာစကား ပြောင်းရန် / Set Language:**\n"
         "`/lang English` သို့မဟုတ် `/lang Burmese` သို့မဟုတ် `/lang Thai`\n\n"
-        "📅 **2. မွေးသက္ကရာဇ် ထည့်ရန် / Set Birth Date:**\n"
+        "📅 **၂။ မွေးသက္ကရာဇ် ထည့်ရန် / Set Birth Date:**\n"
         "(ဥပမာ - `/set_birth_date 2005_03_23`)\n\n"
         "🔮 မွေးသက္ကရာဇ် ထည့်ပြီးပါက သိလိုသမျှ မေးမြန်းနိုင်ပြီး **ဟောကိန်းများအပြင် ဆောင်ရန်/ရှောင်ရန် အဆောင်အယောင်နှင့် ယတြာများပါ** တွက်ချက်ပေးပါမည်!"
     )
@@ -113,27 +113,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     preferred_lang = user_info.get("language", "Burmese")
 
     system_prompt = (
-        "You are 'Grand Master Astrology & Remedy AI', an expert in combining Myanmar Mahabote, Numerology, Western Zodiac, and Tarot. "
-        "Your task is to analyze user questions based on their birth date. "
-        "CRITICAL REQUIREMENTS:\n"
-        "1. Provide deeply accurate astrological insights.\n"
-        "2. ALWAYS include specific remedies (ယတြာ), lucky colors, gemstones, and recommended amulets/charms (အဆောင်အယောင်).\n"
-        f"3. ALWAYS respond strictly in the user's preferred language: '{preferred_lang}'."
+        "You are 'AstroOracle AI', a master astrologer in Myanmar Mahabote, Numerology, Western Zodiac, and Tarot. "
+        "Analyze the user's situation using astrological logic. "
+        "IMPORTANT RULES:\n"
+        "1. Provide detailed astrological predictions.\n"
+        "2. ALWAYS suggest specific remedies (ယတြာ), lucky colors, gemstones, and recommended amulets/charms (အဆောင်အယောင်).\n"
+        f"3. Respond fluently, naturally, and politely in the user's preferred language: '{preferred_lang}'."
     )
 
     user_payload_prompt = f"User Question: {user_text}\nPreferred Response Language: {preferred_lang}"
     if birth_date:
         user_payload_prompt += f"\nUser Birth Date: {birth_date}"
     else:
-        user_payload_prompt += "\nNote: User has not set a birth date. Remind them to use /set_birth_date for deeper remedy accuracy."
+        user_payload_prompt += "\nNote: User has not set a birth date. Kindly remind them to use /set_birth_date for deeper accuracy."
+
+    # Remove extra spaces or quotes from key
+    clean_api_key = GROQ_API_KEY.strip() if GROQ_API_KEY else ""
 
     headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Authorization": f"Bearer {clean_api_key}",
         "Content-Type": "application/json"
     }
 
+    # Using standard stable Groq model name
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama3-70b-8192",
         "messages": [
             {
                 "role": "system",
@@ -157,7 +161,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(reply_message)
         else:
             err_msg = data.get('error', {}).get('message', 'Unknown error')
-            await update.message.reply_text(f"🔴 AI Error: {err_msg}")
+            await update.message.reply_text(f"🔴 AI Error ({res.status_code}): {err_msg}")
 
     except Exception as e:
         await update.message.reply_text(f"🔴 Connection Error: {str(e)}")
@@ -170,7 +174,7 @@ def main():
     app.add_handler(CommandHandler("set_birth_date", set_birth_date))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("Master Astrology & Remedy Bot running...")
+    print("AstroOracle Bot running...")
     app.run_polling()
 
 if __name__ == "__main__":
