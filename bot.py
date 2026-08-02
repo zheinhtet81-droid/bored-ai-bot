@@ -75,18 +75,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     welcome_text = (
         "👋 မင်္ဂလာပါ! **AstroOracle AI** မှ ကြိုဆိုပါတယ်။\n\n"
-        "🌐 **၁။ ဘာသာစကား ပြောင်းရန် / Set Language:**\n"
-        "`/lang English` သို့မဟုတ် `/lang Burmese` သို့မဟုတ် `/lang Thai`\n\n"
-        "📅 **၂။ မွေးသက္ကရာဇ် ထည့်ရန် / Set Birth Date:**\n"
+        "🌐 **၁။ ဘာသာစကား ပြောင်းရန်:**\n"
+        "`/lang English` သို့မဟုတ် `/lang Burmese`\n\n"
+        "📅 **၂။ မွေးသက္ကရာဇ် ထည့်ရန်:**\n"
         "(ဥပမာ - `/set_birth_date 2005_03_23`)\n\n"
-        "🔮 မွေးသက္ကရာဇ် ထည့်ပြီးပါက သိလိုသမျှ မေးမြန်းနိုင်ပြီး **ဟောကိန်းများအပြင် ဆောင်ရန်/ရှောင်ရန် အဆောင်အယောင်နှင့် ယတြာများပါ** တွက်ချက်ပေးပါမည်!"
+        "🔮 မွေးသက္ကရာဇ် ထည့်ပြီးပါက သိလိုသမျှ မေးမြန်းနိုင်ပြီး **ဟောကိန်း၊ ဆောင်ရန်/ရှောင်ရန်၊ ဓာတ်စာနှင့် ယတြာများ** ကို အသေးစိတ် ရှင်းပြပေးပါမည်!"
     )
     await update.message.reply_text(welcome_text, parse_mode='Markdown')
 
 async def set_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not context.args:
-        await update.message.reply_text("ကျေးဇူးပြု၍ ဘာသာစကား ရွေးချယ်ပေးပါ။\nExample: `/lang English` or `/lang Burmese` or `/lang Thai`", parse_mode='Markdown')
+        await update.message.reply_text("ကျေးဇူးပြု၍ ဘာသာစကား ရွေးချယ်ပေးပါ။\nExample: `/lang English` or `/lang Burmese`", parse_mode='Markdown')
         return
 
     lang = context.args[0].capitalize()
@@ -112,20 +112,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     birth_date = user_info.get("birth_date")
     preferred_lang = user_info.get("language", "Burmese")
 
+    # STRICT NATURAL BURMESE PROMPT
     system_prompt = (
-        "You are 'AstroOracle AI', a master astrologer in Myanmar Mahabote, Numerology, Western Zodiac, and Tarot. "
-        "Analyze the user's situation using astrological logic. "
-        "IMPORTANT RULES:\n"
-        "1. Provide detailed astrological predictions.\n"
-        "2. ALWAYS suggest specific remedies (ယတြာ), lucky colors, gemstones, and recommended amulets/charms (အဆောင်အယောင်).\n"
-        f"3. Respond fluently, naturally, and politely in the user's preferred language: '{preferred_lang}'."
+        "You are 'AstroOracle AI', a master Burmese astrologer. "
+        "CRITICAL LANGUAGE INSTRUCTION: "
+        "Write in natural, simple, and realistic spoken Burmese language. "
+        "DO NOT write literal English translations. Avoid strange nonsensical words (e.g., NEVER use terms like 'လက်ကိုင်အရာ', 'အရေးအခင်း', 'ပုလဲဝတ်ပါ'). "
+        "Use natural Myanmar astrological terms like 'ယတြာ', 'ဆောင်ရန်/ရှောင်ရန်', 'ကံဇာတာ', 'အကျိုးပေးရတနာ', 'နေ့နံ'.\n"
+        "Provide your answer organized clearly in bullet points:\n"
+        "1. 🔮 **ဒီနေ့ ကံဇာတာ** (General Prediction)\n"
+        "2. 💡 **အကြံပြုချက်နှင့် ဆောင်ရန်/ရှောင်ရန်** (Advice & Dos/Don'ts)\n"
+        "3. 🍀 **အကျိုးပေး အရောင်နှင့် အဆောင်** (Lucky Colors & Charms)\n"
+        "4. 🙏 **ယတြာနှင့် ပြုလုပ်ရန် ကုသိုလ်** (Remedies & Good Deeds)\n"
+        f"Always answer in '{preferred_lang}'."
     )
 
     user_payload_prompt = f"User Question: {user_text}\nPreferred Response Language: {preferred_lang}"
     if birth_date:
         user_payload_prompt += f"\nUser Birth Date: {birth_date}"
     else:
-        user_payload_prompt += "\nNote: User has not set a birth date. Kindly remind them to use /set_birth_date for deeper accuracy."
+        user_payload_prompt += "\nNote: User hasn't set a birth date. Gently ask them to set it using /set_birth_date for custom readings."
 
     clean_api_key = GROQ_API_KEY.strip() if GROQ_API_KEY else ""
 
@@ -146,7 +152,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "content": user_payload_prompt
             }
         ],
-        "temperature": 0.6
+        "temperature": 0.4
     }
 
     try:
