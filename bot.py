@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# Standard output ကို UTF-8 ပြောင်းခြင်း
+# Standard output encoding setup
 sys.stdout.reconfigure(encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
 
@@ -28,7 +28,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
             username TEXT,
-            birth_date TEXT
+            birth_date TEXT,
+            language TEXT DEFAULT 'Burmese'
         )
     ''')
     conn.commit()
@@ -39,7 +40,7 @@ init_db()
 def register_user(user_id, username):
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
-    cursor.execute('INSERT OR IGNORE INTO users (user_id, username) VALUES (?, ?)', (user_id, username))
+    cursor.execute('INSERT OR IGNORE INTO users (user_id, username, language) VALUES (?, ?, ?)', (user_id, username, 'Burmese'))
     conn.commit()
     conn.close()
 
@@ -50,13 +51,22 @@ def set_user_birth_date(user_id, birth_date):
     conn.commit()
     conn.close()
 
-def get_user_birth_date(user_id):
+def set_user_language(user_id, lang):
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
-    cursor.execute('SELECT birth_date FROM users WHERE user_id = ?', (user_id,))
+    cursor.execute('UPDATE users SET language = ? WHERE user_id = ?', (lang, user_id))
+    conn.commit()
+    conn.close()
+
+def get_user_info(user_id):
+    conn = sqlite3.connect('users.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT birth_date, language FROM users WHERE user_id = ?', (user_id,))
     result = cursor.fetchone()
     conn.close()
-    return result[0] if result else None
+    if result:
+        return {"birth_date": result[0], "language": result[1]}
+    return {"birth_date": None, "language": "Burmese"}
 
 # Command Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -64,36 +74,62 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     register_user(user.id, user.username)
     
     welcome_text = (
-        "👋 မင်္ဂလာပါခင်ဗျာ! **Bored AI** မှ ကြိုဆိုပါတယ်။\n\n"
-        "ပိုမိုတိကျသော analysis ရရှိရန် မွေးသက္ကရာဇ်ကို ထည့်သွင်းပေးပါ။\n"
-        "(ဥပမာ - `/set_birth_date 2009_03_23`)\n\n"
-        "စတင်ကြည့်ရအောင်! 😊"
+        "👋 မင်္ဂလာပါ! **Grand Master Astrology & Remedy AI** မှ ကြိုဆိုပါတယ်။\n\n"
+        "🌐 **1. ဘာသာစကား ပြောင်းရန် / Set Language:**\n"
+        "`/lang English` သို့မဟုတ် `/lang Burmese` သို့မဟုတ် `/lang Thai`\n\n"
+        "📅 **2. မွေးသက္ကရာဇ် ထည့်ရန် / Set Birth Date:**\n"
+        "(ဥပမာ - `/set_birth_date 2005_03_23`)\n\n"
+        "🔮 မွေးသက္ကရာဇ် ထည့်ပြီးပါက သိလိုသမျှ မေးမြန်းနိုင်ပြီး **ဟောကိန်းများအပြင် ဆောင်ရန်/ရှောင်ရန် အဆောင်အယောင်နှင့် ယတြာများပါ** တွက်ချက်ပေးပါမည်!"
     )
     await update.message.reply_text(welcome_text, parse_mode='Markdown')
+
+async def set_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if not context.args:
+        await update.message.reply_text("ကျေးဇူးပြု၍ ဘာသာစကား ရွေးချယ်ပေးပါ။\nExample: `/lang English` or `/lang Burmese` or `/lang Thai`", parse_mode='Markdown')
+        return
+
+    lang = context.args[0].capitalize()
+    set_user_language(user_id, lang)
+    await update.message.reply_text(f"✅ Main Preferred Language set to: **{lang}**", parse_mode='Markdown')
 
 async def set_birth_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not context.args:
-        await update.message.reply_text("ကျေးဇူးပြု၍ မွေးသက္ကရာဇ် ရိုက်ထည့်ပေးပါ။\nဥပမာ - `/set_birth_date 2009_03_23`", parse_mode='Markdown')
+        await update.message.reply_text("ကျေးဇူးပြု၍ မွေးသက္ကရာဇ် ရိုက်ထည့်ပေးပါ။\nဥပမာ - `/set_birth_date 2005_03_23`", parse_mode='Markdown')
         return
 
     birth_date = context.args[0]
     set_user_birth_date(user_id, birth_date)
-    await update.message.reply_text(f"✅ မွေးသက္ကရာဇ် **{birth_date}** ကို သိမ်းဆည်းပြီးပါပြီ!\n\nအကောင့်သစ်အတွက် **10 coins free** ရရှိပါပြီ! 🎉", parse_mode='Markdown')
+    await update.message.reply_text(f"✅ မွေးသက္ကရာဇ် **{birth_date}** ကို မှတ်သားလိုက်ပါပြီ!", parse_mode='Markdown')
 
-# Message Handler (Direct Requests to Groq API)
+# Message Handler
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_text = update.message.text
-    birth_date = get_user_birth_date(user_id)
+    user_info = get_user_info(user_id)
 
-    prompt = f"User Message: {user_text}"
+    birth_date = user_info.get("birth_date")
+    preferred_lang = user_info.get("language", "Burmese")
+
+    system_prompt = (
+        "You are 'Grand Master Astrology & Remedy AI', an expert in combining Myanmar Mahabote, Numerology, Western Zodiac, and Tarot. "
+        "Your task is to analyze user questions based on their birth date. "
+        "CRITICAL REQUIREMENTS:\n"
+        "1. Provide deeply accurate astrological insights.\n"
+        "2. ALWAYS include specific remedies (ယတြာ), lucky colors, gemstones, and recommended amulets/charms (အဆောင်အယောင်).\n"
+        f"3. ALWAYS respond strictly in the user's preferred language: '{preferred_lang}'."
+    )
+
+    user_payload_prompt = f"User Question: {user_text}\nPreferred Response Language: {preferred_lang}"
     if birth_date:
-        prompt += f"\nUser Birth Date: {birth_date}"
+        user_payload_prompt += f"\nUser Birth Date: {birth_date}"
+    else:
+        user_payload_prompt += "\nNote: User has not set a birth date. Remind them to use /set_birth_date for deeper remedy accuracy."
 
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json; charset=utf-8"
+        "Content-Type": "application/json"
     }
 
     payload = {
@@ -101,19 +137,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "messages": [
             {
                 "role": "system",
-                "content": "You are a helpful AI assistant. Always respond in natural Burmese language."
+                "content": system_prompt
             },
             {
                 "role": "user",
-                "content": prompt
+                "content": user_payload_prompt
             }
         ],
-        "temperature": 0.7
+        "temperature": 0.6
     }
 
     try:
         url = "https://api.groq.com/openai/v1/chat/completions"
-        res = requests.post(url, headers=headers, json=payload, timeout=20)
+        res = requests.post(url, headers=headers, json=payload, timeout=25)
         data = res.json()
 
         if res.status_code == 200:
@@ -121,7 +157,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(reply_message)
         else:
             err_msg = data.get('error', {}).get('message', 'Unknown error')
-            await update.message.reply_text(f"🔴 AI Error ({res.status_code}): {err_msg}")
+            await update.message.reply_text(f"🔴 AI Error: {err_msg}")
 
     except Exception as e:
         await update.message.reply_text(f"🔴 Connection Error: {str(e)}")
@@ -130,10 +166,11 @@ def main():
     app = Application.builder().token(TELEGRAM_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("lang", set_lang))
     app.add_handler(CommandHandler("set_birth_date", set_birth_date))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("Bot is running...")
+    print("Master Astrology & Remedy Bot running...")
     app.run_polling()
 
 if __name__ == "__main__":
